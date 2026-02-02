@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
   <app appid='icpjmajkmppnnboecgnoeahdeipmbdpd'>
-    <updatecheck codebase='https://your-server.com/extension.crx' version='1.0' />
+    <updatecheck codebase='https://github.com/jsmith3-lgtm/loaner-extension/CB Loan Extension.crx' version='1.0' />
   </app>
 </gupdate>
