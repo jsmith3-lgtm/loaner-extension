@@ -252,6 +252,7 @@
             <button class="btn tiny" id="roiBtn">Set label area</button>
             <button class="btn tiny" id="ocrBtn">Read name now</button>
             <button class="btn tiny" id="rosterBtn">Known names</button>
+            <button class="btn tiny" id="ignoreBtn">Ignore words</button>
           </div>
           <div class="namerow" id="ocrOpts">
             <label class="chk"><input type="checkbox" id="autoLocate" checked> Find the text automatically</label>
@@ -263,6 +264,8 @@
           <div class="ocrstate" id="ocrState"></div>
           <textarea id="roster" hidden spellcheck="false"
                     placeholder="Paste known names, one per line. Matching is fuzzy, so OCR slips still resolve."></textarea>
+          <textarea id="ignore" hidden spellcheck="false"
+                    placeholder="Words to ignore, one per line \u2014 e.g. Chromebook, a model number. Any OCR line matching one of these is dropped before matching."></textarea>
         </div>
       </div>
       <div class="banner" id="banner" hidden></div>
@@ -302,7 +305,7 @@
     graphics elsewhere are ignored. “Set label area” is only a fallback for the odd label it can't find. OCR has no error correction, so it always proposes rather than decides: nothing is saved until you
     press Enter. Paste your known names and every reading is matched against them — this is what makes
     auto-locate work, since a logo or stray text scores near zero against real names and is discarded. Without
-    a list it still reads, but far less reliably.<br><br>
+    a list it still reads, but far less reliably. Use “Ignore words” to drop fixed text such as a model number if the crop ever catches it.<br><br>
     Rows live in this tab only — export before you close it.
   </p>
 </div>
@@ -320,6 +323,7 @@
    "emptyState","copyBtn","csvBtn","wipeBtn","diag","diagDot","diagText","diagHelp","retryBtn",
    "env","envDot","envText","envHelp","read","readDot","readText",
    "nameMode","nameBody","nameInput","suggest","ocrState","roster","roiBtn","ocrBtn","rosterBtn",
+   "ignoreBtn","ignore",
    "autoLocate","twoWay",
    "t-serial","t-asset","t-name"].forEach(function(id){
     els[id] = document.getElementById(id);
@@ -840,6 +844,7 @@
   /* ---------------- name from printed label (OCR) ---------------- */
   var nameMode = "off";
   var roster = [];
+  var ignoreWords = [];
   var DEFAULT_ROI = { x:.10, y:.38, w:.80, h:.22 };
   var roi = { x:.10, y:.38, w:.80, h:.22 };
   var picking = false, pickStart = null;
@@ -1106,6 +1111,19 @@
   function normName(s){
     return String(s).toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
   }
+  /* A line is ignored if it closely matches any ignore-word. Fuzzy, so an OCR
+     slip like "Chromeb00k" is still dropped. */
+  function isIgnored(line){
+    if(!ignoreWords.length) return false;
+    var L = normName(line);
+    if(!L) return false;
+    return ignoreWords.some(function(w){
+      var W = normName(w);
+      if(!W) return false;
+      if(L === W || L.indexOf(W) !== -1) return true;
+      return rawScore(L, W) >= 0.8;
+    });
+  }
   function lev(a, b){
     if(a === b) return 0;
     if(!a.length) return b.length;
@@ -1168,6 +1186,7 @@
         : String(data.text || "").split(/\n+/);
       var conf = typeof data.confidence === "number" ? data.confidence : 0;
       lines = lines.filter(function(l){ return l.replace(/[^A-Za-z]/g, "").length >= 3; });
+      lines = lines.filter(function(l){ return !isIgnored(l); });
       return { lines:lines, conf:conf };
     });
   }
@@ -1308,7 +1327,16 @@
   els.ocrBtn.onclick = function(){ readName(); };
   els.rosterBtn.onclick = function(){
     els.roster.hidden = !els.roster.hidden;
-    if(!els.roster.hidden) els.roster.focus();
+    if(!els.roster.hidden){ els.ignore.hidden = true; els.roster.focus(); }
+  };
+  els.ignoreBtn.onclick = function(){
+    els.ignore.hidden = !els.ignore.hidden;
+    if(!els.ignore.hidden){ els.roster.hidden = true; els.ignore.focus(); }
+  };
+  els.ignore.oninput = function(){
+    ignoreWords = els.ignore.value.split(/\n+/).map(function(l){ return l.trim(); })
+                  .filter(function(l){ return l.length > 1; });
+    ocrSay(ignoreWords.length ? ignoreWords.length + " word(s) will be ignored." : "No ignore-words set.");
   };
   els.roster.oninput = function(){
     roster = els.roster.value.split(/\n+/).map(function(l){ return l.trim(); })
